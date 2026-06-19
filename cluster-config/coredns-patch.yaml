@@ -1,0 +1,14 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: coredns
+  namespace: kube-system
+spec:
+  template:
+    spec:
+      containers:
+      - name: coredns
+        livenessProbe:
+          httpGet:
+            path: /ready       # Changes target from /health to /ready
+            port: readiness-probe    # <--- Change from liveness-probe (8080) to readiness-probe (8181)

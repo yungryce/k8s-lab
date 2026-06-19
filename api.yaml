@@ -1,0 +1,194 @@
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: api-service
+  namespace: lab-pack
+spec:
+  type: ClusterIP  # Keeps the service internal; Ingress will handle external edge routing
+  selector:
+    app.kubernetes.io/name: backend-fastapi
+  ports:
+    - protocol: TCP
+      port: 80         # The port the Ingress controller will target inside the cluster
+      targetPort: 8000 # The actual port your FastAPI app binds to inside its container
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: backend-fastapi
+  namespace: lab-pack
+  annotations:
+    deployment.kubernetes.io/revision: "1"
+    kubernetes.io/change-cause: "Upgraded backend to FastAPI v7 with zero-trust container runtimes"
+spec:
+  revisionHistoryLimit: 2
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: backend-fastapi
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: backend-fastapi
+        app.kubernetes.io/component: backend
+        app.kubernetes.io/part-of: foliohive
+        gentrixxx.com/billing: lab-cost-101
+    spec:
+      # ─── THE IAM HARDENING UPGRADE ───
+      automountServiceAccountToken: false # 👈 Instantly blocks token injection into the container
+
+      # --- Global Pod-Level Context ---
+      securityContext:
+          runAsNonRoot: true
+          runAsUser: 1000
+          fsGroup: 1000
+
+      # --- 1. Alembic Migrations InitContainer ---
+      # This container shares the runtime image and runs to absolute completion
+      # BEFORE the main application web container is allowed to launch.
+      initContainers:
+      - name: run-migrations
+        image: fastapi:v7
+        command: ["alembic", "upgrade", "head"]
+        workingDir: /app
+        # Container-level kernel hardening
+        securityContext:
+          allowPrivilegeEscalation: false
+          readOnlyRootFilesystem: true  # Freezes the runtime disk during migrations
+        env:
+          - name: POSTGRES_HOST
+            value: "postgres-0.postgres-service.lab-pack.svc.cluster.local"
+          - name: POSTGRES_PORT
+            value: "5432"
+          - name: POSTGRES_USER
+            valueFrom:
+              secretKeyRef:
+                name: postgres-secret
+                key: POSTGRES_USER
+          - name: POSTGRES_PASSWORD
+            valueFrom:
+              secretKeyRef:
+                name: postgres-secret
+                key: POSTGRES_PASSWORD
+          - name: POSTGRES_DB
+            valueFrom:
+              secretKeyRef:
+                name: postgres-secret
+                key: POSTGRES_DB
+        # Provides isolated memory scratchpad for Alembic runtime cache if needed
+        volumeMounts:
+          - name: ephemeral-tmp
+            mountPath: /tmp
+
+      # --- 2. Main FastAPI Application Container ---
+      containers:
+        - name: fastapi-container
+          image: fastapi:v7
+          imagePullPolicy: IfNotPresent
+          # Container-level kernel hardening
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true  # Completely locks down the application filesystem
+          ports:
+            - name: api-port
+              containerPort: 8000
+          env:
+            - name: POSTGRES_HOST
+              value: "postgres-0.postgres-service.lab-pack.svc.cluster.local"
+            - name: POSTGRES_PORT
+              value: "5432"
+            - name: POSTGRES_USER
+              valueFrom:
+                secretKeyRef:
+                  name: postgres-secret
+                  key: POSTGRES_USER
+            - name: POSTGRES_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: postgres-secret
+                  key: POSTGRES_PASSWORD
+            - name: POSTGRES_DB
+              valueFrom:
+                secretKeyRef:
+                  name: postgres-secret
+                  key: POSTGRES_DB
+
+          # Liveness probe to check the health of the container
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: 8000
+            initialDelaySeconds: 5
+            periodSeconds: 10
+            timeoutSeconds: 2
+            failureThreshold: 3
+          readinessProbe:
+            httpGet:
+              path: /db-check
+              port: 8000
+            initialDelaySeconds: 5
+            periodSeconds: 10
+            timeoutSeconds: 2
+            failureThreshold: 3
+
+          # Resource limits and requests for the container
+          resources:
+            requests:
+              cpu: "100m"
+              memory: "128Mi"
+            limits:
+              cpu: "250m"
+              memory: "256Mi"
+          # Ephemeral emptyDir volume for InitContainer scratch space
+          volumeMounts:
+            - name: ephemeral-tmp
+              mountPath: /tmp
+
+      # --- 3. Shareable Virtual RAM Volume ---
+      volumes:
+        - name: ephemeral-tmp
+          emptyDir: {}
+
+---
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: backend-fastapi-hpa
+  namespace: lab-pack
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: backend-fastapi
+  minReplicas: 2
+  maxReplicas: 5
+  metrics:
+    # Rule 1: Scale based on CPU Core utilization
+    - type: Resource
+      resource:
+        name: cpu
+        target:
+          type: Utilization
+          averageUtilization: 70 # Scales up if average CPU utilization crosses 70% of requested limits
+    # Rule 2: Scale based on Memory footprint
+    - type: Resource
+      resource:
+        name: memory
+        target:
+          type: Utilization
+          averageUtilization: 80 # Scales up if memory leaks or data caching crosses 80%
+  behavior:
+      scaleDown:
+        stabilizationWindowSeconds: 60 # 👈 Reduces the default 5-minute wait down to just 60 seconds
+        policies:
+          - type: Percent
+            value: 100
+            periodSeconds: 15
+      scaleUp:
+        stabilizationWindowSeconds: 0   # 👈 Keeps scale-up instant (0 seconds wait)
+        policies:
+          - type: Percent
+            value: 100
+            periodSeconds: 15

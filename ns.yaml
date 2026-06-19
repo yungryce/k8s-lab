@@ -1,0 +1,8 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: lab-pack
+  labels:
+    app.kubernetes.io/name: foliohive
+    app.kubernetes.io/part-of: foliohive
+

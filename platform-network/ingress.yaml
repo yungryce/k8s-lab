@@ -1,0 +1,21 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: foliohive-ingress
+  namespace: lab-pack
+  annotations:
+    # ✅ Keep custom provider properties here (like request buffering buffers or sizes)
+    nginx.ingress.kubernetes.io/proxy-body-size: "15m"
+spec:
+  ingressClassName: nginx  # ✨ Modern replacement for the legacy annotation class property
+  rules:
+    - host: api.foliohive.local
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: api-service
+                port:
+                  number: 80

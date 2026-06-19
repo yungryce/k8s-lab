@@ -1,0 +1,14 @@
+.pyc
+.pycache/
+*.pyc
+*.pyo
+*.pyd   
+
+# env
+.env
+.env.local
+.env.*  
+
+# alembic
+alembic/
+alembic/versions/*

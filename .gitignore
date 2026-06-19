@@ -1,0 +1,42 @@
+# ==============================================================================
+# 1. KUBERNETES & INFRASTRUCTURE SECRETS
+# ==============================================================================
+# Ignore all raw Kubernetes secret manifest files explicitly
+secret/secret.yaml
+secret/*.yaml
+
+# ==============================================================================
+# 2. PYTHON ENVIRONMENT & BUILD ARTIFACTS
+# ==============================================================================
+# Ignore the local Python virtual environment directory
+src/venv/
+venv/
+
+# Ignore compiled Python bytecode
+**/__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# Ignore local environment variable override files
+.env
+.env.*
+
+# ==============================================================================
+# 3. DATABASE & MIGRATIONS
+# ==============================================================================
+# If your sqlite database or local dump file gets generated locally
+*.db
+*.sqlite3
+
+# ==============================================================================
+# 4. OPERATING SYSTEM & IDE CONFIGURATIONS
+# ==============================================================================
+# macOS system files
+.DS_Store
+Thumbs.db
+
+# IDE configuration folders
+.vscode/
+.idea/
+*.swp
