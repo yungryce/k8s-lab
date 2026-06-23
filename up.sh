@@ -6,7 +6,8 @@ set -e
 
 CLUSTER_NAME="ckad-docker"
 NAMESPACE="lab-pack"
-APP_IMAGE="fastapi:v7"
+APP_IMAGE="fastapi:v9"
+MONITORING_NAMESPACE="monitoring"
 
 echo "🚀 Booting Minikube nodes with resource profiles..."
 # Passing hardware specs ensures a proper scratch build, while remaining safe for warm reboots
@@ -24,7 +25,6 @@ kubectl wait --for=condition=Ready nodes --all --timeout=90s
 
 # --- Local Image Sourcing ---
 echo "📦 Verifying local image availability inside cluster namespaces..."
-# Checks if the image tag is already cached inside Minikube's image cache table
 if ! minikube image ls -p "$CLUSTER_NAME" | grep -q "$APP_IMAGE"; then
     echo "📥 Image '$APP_IMAGE' not found in cluster cache. Transporting image layers..."
     minikube image load "$APP_IMAGE" -p "$CLUSTER_NAME"
@@ -40,9 +40,7 @@ echo "⚙️ Validating core platform addons..."
 if ! minikube addons list -p "$CLUSTER_NAME" | grep -q "ingress.*enabled"; then
     echo "📦 Ingress addon not active. Enabling NGINX Ingress Controller..."
     minikube addons enable ingress -p "$CLUSTER_NAME"
-    
     echo "⏳ Waiting for Ingress controller webhook components to initialize..."
-    # This prevents race conditions where application manifests apply before the webhook is ready
     sleep 20 
 else
     echo "✅ Ingress addon is already active."
@@ -52,7 +50,6 @@ fi
 if ! minikube addons list -p "$CLUSTER_NAME" | grep -q "metrics-server.*enabled"; then
     echo "📊 Metrics Server not active. Enabling Native Engine..."
     minikube addons enable metrics-server -p "$CLUSTER_NAME"
-    
     echo "🛠️ Patching metrics-server to accept local self-signed certificates..."
     kubectl patch deployment metrics-server -n kube-system --type='json' -p='[
       {"op": "add", "path": "/spec/template/spec/containers/0/args/-", "value": "--kubelet-insecure-tls"}
@@ -61,7 +58,7 @@ else
     echo "✅ Metrics Server addon is already active."
 fi
 
-# --- Workload & Patch Execution Layer ---
+# --- 1. CONFIGS: Workload & Patch Execution Layer ---
 echo "🛠️ Enforcing declarative cluster-level infrastructure overrides..."
 kubectl apply -k cluster-config/
 
@@ -72,15 +69,29 @@ kubectl rollout restart deployment/coredns -n kube-system
 echo "⏳ Giving network controllers a brief window to align..."
 sleep 10
 
-echo "📦 Provisioning application stack workloads..."
-# Ensure namespace creation is explicitly executed first
+echo "📦 Provisioning foundational namespace and secret layers..."
 if [ -f ns.yaml ]; then kubectl apply -f ns.yaml; fi
 if [ -f secret/secret.yaml ]; then kubectl apply -f secret/secret.yaml; fi
 
+# --- 2. CHARTS: Declarative Platform Monitoring Layer (Helm 4 Pipeline) ---
+echo "📊 Orchestrating Cluster Observability Grid via Helm 4..."
+echo "🔄 Resolving external chart dependencies for platform-monitoring..."
+helm dependency update platform-monitoring/
+
+echo "🚀 Enforcing declarative monitoring state upgrades..."
+helm upgrade --install kube-prom platform-monitoring/ \
+  --namespace "$MONITORING_NAMESPACE" \
+  --values platform-monitoring/values.yaml
+
+# --- 3. MANIFESTS: Core Workload & Scaling Allocation Layer ---
+echo "🚀 Deploying application stack manifests..."
 kubectl apply -f db.yaml
 kubectl apply -f api.yaml
 kubectl apply -f platform-network/ingress.yaml
 kubectl apply -f platform-network/network-policy.yaml
+kubectl apply -f platform-monitoring/api-service-monitor.yaml
+kubectl apply -f platform-monitoring/ingress-monitor.yaml
+
 echo "🎯 Tuning local workspace focus rules..."
 kubectl config set-context ckad-docker --namespace=$NAMESPACE
 

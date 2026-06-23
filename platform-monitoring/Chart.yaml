@@ -1,0 +1,12 @@
+apiVersion: v2
+name: cluster-monitoring
+description: Declarative infrastructure monitoring umbrella chart for Foliohive
+type: application
+version: 1.0.0
+appVersion: 1.0.0
+
+# --- Declarative Repository Dependencies ---
+dependencies:
+  - name: kube-prometheus-stack
+    version: ">=0.0.0" # Grabs the latest stable tracking version matching Helm 4 specs
+    repository: "https://prometheus-community.github.io/helm-charts"

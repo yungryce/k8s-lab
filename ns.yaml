@@ -6,3 +6,10 @@ metadata:
     app.kubernetes.io/name: foliohive
     app.kubernetes.io/part-of: foliohive
 
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: monitoring
+  labels:
+    app.kubernetes.io/part-of: infrastructure
+    security.kubernetes.io/enforce: privileged # The monitoring agents need host metrics access

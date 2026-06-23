@@ -1,0 +1,36 @@
+# --- Custom Helm 4 Overrides for Lab Cluster ---
+
+kube-prometheus-stack:
+  # ─── 1. CORE COMPONENT ENABLE/DISABLE TOGGLES ───
+  alertmanager:
+    enabled: false
+
+  kubeStateMetrics:
+    enabled: true
+
+  nodeExporter:
+    enabled: true
+
+  # ─── 2. PROMETHEUS CORE & ENGINE STORAGE CONFIGURATIONS ───
+  prometheus:
+    prometheusSpec:
+      retention: 2d
+      # Sub-path routing parameters
+      externalUrl: http://api.foliohive.local:8080/prometheus/
+      routePrefix: /
+      storageSpec:
+        emptyDir:
+          medium: ""
+
+  # ─── 3. GRAFANA SERVER & AUTHN CONFIGURATIONS ───
+  grafana:
+    enabled: true
+    adminPassword: "admin" # ✨ This officially sets your credentials!
+    service:
+      type: ClusterIP
+    # Sub-path proxy configuration rules
+    grafana.ini:
+      server:
+        domain: api.foliohive.local
+        root_url: "%(protocol)s://%(domain)s:8080/grafana/"
+        serve_from_sub_path: true

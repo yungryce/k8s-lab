@@ -1,0 +1,32 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: infrastructure-monitoring-ingress
+  namespace: monitoring
+  annotations:
+    # ⚠️ These remain mandatory here because Grafana/Prometheus rely on sub-path trimming
+    nginx.ingress.kubernetes.io/rewrite-target: /$2
+    nginx.ingress.kubernetes.io/use-regex: "true"
+spec:
+  ingressClassName: nginx
+  rules:
+    - host: api.foliohive.local
+      http:
+        paths:
+          # 1. Grafana Sub-Path
+          - path: /grafana(/|$)(.*)
+            pathType: ImplementationSpecific
+            backend:
+              service:
+                name: kube-prom-grafana
+                port:
+                  number: 80
+
+          # 2. Prometheus Sub-Path
+          - path: /prometheus(/|$)(.*)
+            pathType: ImplementationSpecific
+            backend:
+              service:
+                name: kube-prom-kube-prometheus-prometheus
+                port:
+                  number: 9090

@@ -8,3 +8,5 @@ pydantic-settings==2.6.1
 alembic==1.14.0
 
 python-json-logger
+
+prometheus_fastapi_instrumentator

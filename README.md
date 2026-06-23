@@ -36,6 +36,7 @@ kubectl rollout restart deployment/coredns -n kube-system
 kubectl rollout restart daemonset/kindnet -n kube-system
 kubelctl logs -n kube-system -l k8s-app=kube-dns -c coredns
 
-kubectl port-forward -n lab-pack statefulset/postgres 5435:5432 > /dev/null 2>&1 &
 
-
+# The Complete Dual-Tunnel Dev Fleet
+kubectl port-forward deployment/ingress-nginx-controller 8080:80 -n ingress-nginx > /dev/null 2>&1 & \
+kubectl port-forward statefulset/postgres 5435:5432 -n lab-pack > /dev/null 2>&1 &

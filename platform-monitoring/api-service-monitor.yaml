@@ -1,0 +1,17 @@
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: backend-fastapi-monitor
+  namespace: lab-pack
+  # ─── RING 1: WIRES THE MONITOR TO PROMETHEUS ───
+  labels:
+    release: kube-prom # 👈 This lets Prometheus discover this specific Monitor
+spec:
+  # ─── RING 2: WIRES THE MONITOR TO YOUR APP SERVICE ───
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: backend-fastapi # 👈 Matches the label in your api.yaml
+  endpoints:
+    - port: api-port 
+      path: /metrics 
+      interval: 15s
