@@ -25,7 +25,7 @@ kube-prometheus-stack:
   # ─── 3. GRAFANA SERVER & AUTHN CONFIGURATIONS ───
   grafana:
     enabled: true
-    adminPassword: "admin" # ✨ This officially sets your credentials!
+    adminPassword: "admin"
     service:
       type: ClusterIP
     # Sub-path proxy configuration rules
@@ -34,3 +34,134 @@ kube-prometheus-stack:
         domain: api.foliohive.local
         root_url: "%(protocol)s://%(domain)s:8080/grafana/"
         serve_from_sub_path: false
+
+    # 🛠️ FIXED: Enable the dashboard/datasource auto-provisioning sidecar
+    sidecar:
+      datasources:
+        enabled: true
+        label: grafana_datasource
+        labelValue: "1"
+        searchNamespace: ALL
+
+    # Register Loki as an additional datasource for log exploration
+    additionalDataSources:
+      - name: Loki
+        type: loki
+        access: proxy
+        url: http://kube-prom-loki:3100
+        isDefault: false
+        jsonData:
+          maxLines: 1000
+
+# ─── 4. LOKI — SINGLE-BINARY FILESYSTEM MODE (LEAN) ───
+loki:
+  deploymentMode: SingleBinary
+  # Zero out SimpleScalable targets — SingleBinary only
+  write:
+    replicas: 0
+  read:
+    replicas: 0
+  backend:
+    replicas: 0
+
+  # Disable auth — internal cluster only
+  loki:
+    auth_enabled: false
+    commonConfig:
+      path_prefix: /var/loki
+      replication_factor: 1
+
+    # Keep your optimized limits active
+    limits_config:
+      ingestion_rate_mb: 50
+      ingestion_burst_size_mb: 100
+      max_streams_per_user: 10000
+
+    # Filesystem storage (no object store dependency)
+    storage:
+      type: filesystem
+    schemaConfig:
+      configs:
+        - from: "2024-01-01"
+          store: tsdb
+          object_store: filesystem
+          schema: v13
+          index:
+            prefix: index_
+            period: 24h
+    # Disable ruler — not needed for log aggregation lab
+    ruler:
+      enabled: false
+
+  # Single-binary node: 1 replica, minimal resources
+  singleBinary:
+    replicas: 1
+    # Disable PVC persistence — use emptyDir via extraVolumes below
+    persistence:
+      enabled: false
+    resources:
+      requests:
+        cpu: "100m"
+        memory: "256Mi"
+      limits:
+        cpu: "500m"
+        memory: "512Mi"
+    # Writeable emptyDir for filesystem storage (readOnlyRootFilesystem keeps system immutable)
+    extraVolumeMounts:
+      - name: data
+        mountPath: /var/loki
+    extraVolumes:
+      - name: data
+        emptyDir: {}
+
+  # Disable unnecessary components to keep footprint lean
+  gateway:
+    enabled: false
+  lokiCanary:
+    enabled: false
+  sidecar:
+    rules:
+      enabled: false
+  memcached:
+    enabled: false
+  memcachedExporter:
+    enabled: false
+  resultsCache:
+    enabled: false
+  chunksCache:
+    enabled: false
+  monitoring:
+    dashboards:
+      enabled: false
+    rules:
+      enabled: false
+    serviceMonitor:
+      enabled: false
+    selfMonitoring:
+      enabled: false
+  test:
+    enabled: false
+
+  extraArgs:
+        - "-memberlist.bind-addr=127.0.0.1"
+        - "-memberlist.bind-port=7946"
+
+# ─── 5. PROMTAIL — DAEMONSET LOG COLLECTOR (LEAN) ───
+promtail:
+  daemonset:
+    enabled: true
+    resources:
+      requests:
+        cpu: "50m"
+        memory: "64Mi"
+      limits:
+        cpu: "100m"
+        memory: "128Mi"
+
+  config:
+    logLevel: info
+    logFormat: json
+    # Push directly to the Loki single-binary service (no gateway)
+    clients:
+      - url: http://kube-prom-loki:3100/loki/api/v1/push
+

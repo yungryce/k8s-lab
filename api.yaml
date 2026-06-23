@@ -26,7 +26,7 @@ metadata:
   namespace: lab-pack
   annotations:
     deployment.kubernetes.io/revision: "1"
-    kubernetes.io/change-cause: "Upgraded backend to FastAPI v9 with zero-trust container runtimes"
+    kubernetes.io/change-cause: "Upgraded backend to FastAPI v11 with zero-trust container runtimes"
 spec:
   revisionHistoryLimit: 2
   replicas: 1
@@ -55,7 +55,7 @@ spec:
       # BEFORE the main application web container is allowed to launch.
       initContainers:
       - name: run-migrations
-        image: fastapi:v9
+        image: fastapi:v11
         command: ["alembic", "upgrade", "head"]
         workingDir: /app
         # Container-level kernel hardening
@@ -90,7 +90,7 @@ spec:
       # --- 2. Main FastAPI Application Container ---
       containers:
         - name: fastapi-container
-          image: fastapi:v9
+          image: fastapi:v11
           imagePullPolicy: IfNotPresent
           # Container-level kernel hardening
           securityContext:

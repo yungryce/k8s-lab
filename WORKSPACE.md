@@ -21,7 +21,7 @@ This repository is a living laboratory. We do not just deploy tools; we deconstr
 | Kubernetes version      | `v1.35.1` |
 | Node topology           | `ckad-docker` (control-plane), `ckad-docker-m02` (worker) |
 | Ingress                 | NGINX Ingress Controller (Minikube addon), `api.foliohive.local` |
-| Monitoring              | Prometheus + Grafana via `kube-prometheus-stack` Helm chart |
+| Monitoring              | Prometheus + Grafana via `kube-prometheus-stack` Helm chart, Loki (log aggregation) + Promtail (log collector) |
 | Metrics                 | Minikube metrics-server addon with `--kubelet-insecure-tls` |
 | Stateful storage        | PostgreSQL 18.4 on StatefulSet with hostPath PV pinned to worker node |
 | Orchestration           | `up.sh` — idempotent convergence loop (no imperative mutations) |
@@ -44,7 +44,7 @@ This repository is a living laboratory. We do not just deploy tools; we deconstr
 
 | Chart | Namespace | Purpose |
 |-------|-----------|---------|
-| `platform-monitoring/` (v2, `kube-prometheus-stack` dep) | `monitoring` | Prometheus + Grafana + node-exporter (alertmanager disabled) |
+| `platform-monitoring/` (v2, `kube-prometheus-stack` + `loki` + `promtail` deps) | `monitoring` | Prometheus + Grafana + node-exporter (alertmanager disabled), Loki (single-binary filesystem), Promtail (DaemonSet log collector) |
 
 ### Current cluster state (kube-system)
 
@@ -68,7 +68,7 @@ This repository is a living laboratory. We do not just deploy tools; we deconstr
 
 ### Multi-Container Pod Design (Init Container)
 - **InitContainer `run-migrations`** runs `alembic upgrade head` before the main container starts
-- Uses the same runtime image (`fastapi:v9`) and inherits the same env config
+- Uses the same runtime image (`fastapi:v11`) and inherits the same env config
 - Blocking pattern: migrations must succeed before the FastAPI app launches
 - `securityContext` hardening: `allowPrivilegeEscalation: false`, `readOnlyRootFilesystem: true`, ephemeral `/tmp` volume
 
@@ -108,6 +108,9 @@ This repository is a living laboratory. We do not just deploy tools; we deconstr
 - Prometheus metrics auto-exposed at `/metrics` via `prometheus_fastapi_instrumentator`
 - ServiceMonitor for Prometheus auto-discovery
 - Grafana with admin credentials (`admin` / `admin`)
+- **Loki** (single-binary filesystem mode) for log aggregation — lean footprint, no object store dependency
+- **Promtail** DaemonSet collecting all pod logs and shipping to Loki
+- Loki registered as a Grafana datasource for log exploration alongside metrics
 
 ---
 
@@ -136,6 +139,14 @@ This repository is a living laboratory. We do not just deploy tools; we deconstr
 - Currently `up.sh` is a bash convergence loop (apply-and-wait)
 - Target: Replace with ArgoCD watching this Git repo and pulling changes automatically
 - Pre-requisite: Repo must be properly structured with Kustomize overlays for env differences
+
+### Module E ✅ Completed: Log Aggregation (Loki + Promtail)
+*CKAD Domain: Observability & Maintenance (15%)*
+- Loki deployed in single-binary filesystem mode — no object store dependency, minimal resource footprint (100m CPU / 128Mi memory)
+- Promtail DaemonSet scrapes all pod logs across cluster nodes (50m CPU / 64Mi memory per node)
+- Loki registered as an additional Grafana datasource for Explore → Logs
+- Log shipping path: container stdout → Promtail → Loki → Grafana
+- Known limitation: Filesystem storage is ephemeral (emptyDir) — logs lost on pod restart; acceptable for lab
 
 ---
 
@@ -183,8 +194,8 @@ root/
 |--------|---------|
 | Dev server | `uvicorn app.app:app --host 127.0.0.1 --port 8000 --reload` |
 | Alembic migration | `alembic upgrade head` |
-| Docker build | `docker build -t fastapi:v9 .` (from `src/`) |
-| Minikube image load | `minikube -p ckad-docker image load fastapi:v9` |
+| Docker build | `docker build -t fastapi:v11 .` (from `src/`) |
+| Minikube image load | `minikube -p ckad-docker image load fastapi:v11` |
 | Full cluster deploy | `./up.sh` |
 
 ---

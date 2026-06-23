@@ -6,7 +6,7 @@ set -e
 
 CLUSTER_NAME="ckad-docker"
 NAMESPACE="lab-pack"
-APP_IMAGE="fastapi:v9"
+APP_IMAGE="fastapi:v11"
 MONITORING_NAMESPACE="monitoring"
 
 echo "🚀 Booting Minikube nodes with resource profiles..."
