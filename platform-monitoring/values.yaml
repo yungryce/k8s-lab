@@ -16,7 +16,7 @@ kube-prometheus-stack:
     prometheusSpec:
       retention: 2d
       # Sub-path routing parameters
-      externalUrl: http://api.foliohive.local:8080/prometheus/
+      externalUrl: http://api.foliohive.local/prometheus/
       routePrefix: /
       storageSpec:
         emptyDir:
@@ -33,4 +33,4 @@ kube-prometheus-stack:
       server:
         domain: api.foliohive.local
         root_url: "%(protocol)s://%(domain)s:8080/grafana/"
-        serve_from_sub_path: true
+        serve_from_sub_path: false

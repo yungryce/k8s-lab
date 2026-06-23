@@ -38,5 +38,6 @@ kubelctl logs -n kube-system -l k8s-app=kube-dns -c coredns
 
 
 # The Complete Dual-Tunnel Dev Fleet
+kubectl port-forward -n ingress-nginx deployment/ingress-nginx-controller 8080:80
 kubectl port-forward deployment/ingress-nginx-controller 8080:80 -n ingress-nginx > /dev/null 2>&1 & \
 kubectl port-forward statefulset/postgres 5435:5432 -n lab-pack > /dev/null 2>&1 &

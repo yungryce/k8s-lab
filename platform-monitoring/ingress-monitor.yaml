@@ -7,6 +7,7 @@ metadata:
     # ⚠️ These remain mandatory here because Grafana/Prometheus rely on sub-path trimming
     nginx.ingress.kubernetes.io/rewrite-target: /$2
     nginx.ingress.kubernetes.io/use-regex: "true"
+    nginx.ingress.kubernetes.io/x-forwarded-port: "true"
 spec:
   ingressClassName: nginx
   rules:

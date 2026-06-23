@@ -13,7 +13,8 @@ spec:
   selector:
     app.kubernetes.io/name: backend-fastapi
   ports:
-    - protocol: TCP
+    - name: api-port
+      protocol: TCP
       port: 80         # The port the Ingress controller will target inside the cluster
       targetPort: 8000 # The actual port your FastAPI app binds to inside its container
 

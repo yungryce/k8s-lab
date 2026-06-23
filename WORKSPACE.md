@@ -210,3 +210,4 @@ if git rev-parse --is-inside-work-tree > /dev/null 2>&1; then
     # In a real pipeline this would be 'git pull', locally we just read the workspace
 fi
 ```
+

@@ -5,6 +5,9 @@
 secret/secret.yaml
 secret/*.yaml
 
+# Ignore packaged Helm chart archives under platform-monitoring
+platform-monitoring/charts/*.tgz
+
 # ==============================================================================
 # 2. PYTHON ENVIRONMENT & BUILD ARTIFACTS
 # ==============================================================================
